@@ -624,7 +624,7 @@ footer{font-size:12.5px;color:var(--faint);line-height:1.75;padding:22px 2px 0}
 
   <div class="sidefoot">주식회사 넷폼 · 서비스운영본부<br>
     올린 엑셀은 이 브라우저 안에서만 처리되고, 대장은 회사 저장소에 남습니다.<br>
-    <label class="foottool">업체정보 올리기<input id="bizUp" class="hidefile" type="file" accept=".json,application/json"></label>
+    <label class="foottool">업체정보 · 지난 기록 올리기<input id="bizUp" class="hidefile" type="file" accept=".json,application/json"></label>
     <span class="foottool" id="btnOut">로그아웃</span></div>
 </aside>
 
@@ -1441,11 +1441,29 @@ function bizLoad(){
   FBDB.doc('bizinfo').get().then(function(s){ bizApply(s.exists? s.data():null); },
     function(){ bizApply(null); });
 }
+/* 지난 보고(대장)를 통째로 올린다 — 옛 현황판에서 옮겨올 때 한 번만 쓴다 */
+function ledUpload(map){
+  var ids=Object.keys(map||{});
+  if(!ids.length){ toast('대장 내용이 비어 있습니다.'); return; }
+  if(!confirm('지난 기록 '+ids.length+'개사를 저장소에 넣습니다.\n같은 업체가 이미 있으면 덮어씁니다. 계속할까요?')) return;
+  var done=0, bad=0;
+  ids.forEach(function(id){
+    FBDB.collection('ledger').doc(id).set(map[id]).then(function(){
+      ledger[id]=map[id]; done++; fin();
+    }, function(){ bad++; fin(); });
+  });
+  function fin(){
+    if(done+bad<ids.length) return;
+    toast('지난 기록 '+done+'개사를 넣었습니다.'+(bad? ' ('+bad+'개사 실패)':''));
+    render();
+  }
+}
 function bizUpload(file){
   var fr=new FileReader();
   fr.onload=function(){
     var o; try{ o=JSON.parse(fr.result); }catch(e){ toast('JSON 파일이 아닙니다.'); return; }
-    if(!o || !o.contacts){ toast('업체정보 파일이 아닙니다.'); return; }
+    if(o && o.ledger && !o.contacts){ ledUpload(o.ledger); return; }
+    if(!o || !o.contacts){ toast('업체정보 파일도, 지난 기록 파일도 아닙니다.'); return; }
     FBDB.doc('bizinfo').set({ contacts:o.contacts, payday:o.payday||'{}',
       updated:ymd(new Date()) }).then(function(){
         toast('업체정보를 저장소에 올렸습니다.'); bizApply(o);
